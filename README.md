@@ -1,6 +1,6 @@
 # my_hermes_manager
 
-Hermes 定时任务的消息时间线，外加独立应用面板。本地叫总台。
+Hermes 定时任务的消息时间线，外加独立应用面板。界面标题 Hermes 总台。
 
 ## 功能
 
