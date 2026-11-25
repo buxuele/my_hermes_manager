@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+logs/
+.hub_state.json
+.no_auto_sync
+hub.db
+hub.db-wal
+hub.db-shm
+.DS_Store

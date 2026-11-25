@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="brand">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>总台</title>
+<meta name="theme-color" content="#c9b8ff">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<script>
+try { if (localStorage.getItem("hub_theme") === "gray") document.documentElement.dataset.theme = "gray"; } catch (e) {}
+</script>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-view="feed">
+
+<header class="topbar">
+  <div class="brand">
+    <h1>总台</h1>
+    <span class="unread-pill zero" id="unreadPill">0</span>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-view="feed" role="tab" aria-selected="true">消息</button>
+    <button class="tab" data-view="jobs" role="tab" aria-selected="false">任务</button>
+    <button class="tab" data-view="apps" role="tab" aria-selected="false">应用</button>
+  </nav>
+  <div class="top-actions">
+    <button class="theme" id="themeBtn" type="button" title="切换到灰色主题">灰色</button>
+    <button class="sync" id="syncBtn" type="button" title="立即同步">
+      <i class="sync-dot"></i><span class="sync-text">未同步</span>
+    </button>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="stat-grid">
+      <div class="stat-cell"><b id="statContent">0</b><span>有内容</span></div>
+      <div class="stat-cell"><b id="statUnread">0</b><span>未读</span></div>
+      <div class="stat-cell"><b id="statAttention">0</b><span>异常任务</span></div>
+      <div class="stat-cell"><b id="statSpan">0</b><span>覆盖天数</span></div>
+    </div>
+    <p class="side-title">任务</p>
+    <ul class="job-list" id="jobList"></ul>
+  </aside>
+
+  <main class="main">
+    <div id="viewFeed">
+      <div class="filterbar">
+        <label class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input id="searchInput" type="search" placeholder="搜消息内容" autocomplete="off" aria-label="搜消息内容">
+        </label>
+        <button class="chip" id="chipUnread"><span class="dot"></span>只看未读</button>
+        <button class="chip" id="chipSilent">含静默轮次</button>
+        <button class="chip hidden" id="chipJob" title="清除任务筛选"></button>
+      </div>
+
+      <div class="new-bar hidden" id="newBar"><button id="newBarBtn"></button></div>
+
+      <div class="timeline" id="timeline"></div>
+      <div class="pager" id="pager"></div>
+    </div>
+
+    <div id="viewJobs" class="hidden">
+      <div class="jobs-summary" id="jobsSummary"></div>
+      <div class="jobs-grid" id="jobsGrid"></div>
+    </div>
+
+    <div id="viewApps" class="hidden">
+      <div class="apps-grid" id="appsGrid"></div>
+    </div>
+  </main>
+</div>
+
+<button class="fab" id="fab">全部标为已读 <span class="cnt" id="fabCnt">0</span></button>
+
+<div class="drawer-mask" id="mask"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+  <div class="drawer-head">
+    <span class="drawer-title" id="drawerTitle"></span>
+    <button class="icon-btn" id="drawerOpen" title="新窗口打开" aria-label="新窗口打开">↗</button>
+    <button class="icon-btn" id="drawerClose" title="关闭" aria-label="关闭">×</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<div class="modal-mask hidden" id="modalMask">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h2 id="modalTitle">标为已读</h2>
+    <p id="modalText"></p>
+    <div class="modal-actions">
+      <button class="btn-sm" id="modalCancel">取消</button>
+      <button class="btn-sm primary" id="modalOk">标为已读</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="lightbox hidden" id="lightbox" role="dialog" aria-modal="true" aria-label="图片">
+  <button class="lightbox-close" id="lightboxClose" aria-label="关闭">×</button>
+  <img alt="">
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

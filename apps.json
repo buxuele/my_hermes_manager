@@ -1,0 +1,40 @@
+{
+  "quiet_exempt": [
+    "ff88b7fadb28",
+    "aa56e4b27737",
+    "b1f2c3d4e5a6",
+    "33a7374881a9"
+  ],
+  "apps": [
+    {
+      "key": "opportunity_radar",
+      "name": "商机雷达",
+      "desc": "Reddit 与 HN 的需求信号采集、抽取与精选库",
+      "type": "service",
+      "path": "../opportunity_radar",
+      "ports": [
+        8787
+      ],
+      "health": "/",
+      "start_hint": "cd ~/code/hermes_apps/opportunity_radar && python3 server.py"
+    },
+    {
+      "key": "hermes_docs",
+      "name": "Hermes 中文文档",
+      "desc": "本机整理的上游文档，按主题分目录",
+      "type": "content",
+      "path": "../hermes-docs",
+      "recursive": true,
+      "depth": 5
+    },
+    {
+      "key": "local_docs",
+      "name": "本机笔记",
+      "desc": "工作区里的定时任务机制、接入记录与排查文档",
+      "type": "content",
+      "path": "../docs",
+      "recursive": true,
+      "depth": 2
+    }
+  ]
+}
