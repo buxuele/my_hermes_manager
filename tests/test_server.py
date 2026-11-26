@@ -44,9 +44,9 @@ class ContentFilesTest(unittest.TestCase):
         self.assertIsNone(server.static_path("../../AGENTS.md"))
 
     def test_host_allowlist(self):
-        for ok in ("127.0.0.1:8899", "localhost:8899", "[::1]:8899"):
+        for ok in ("127.0.0.1:8970", "localhost:8970", "[::1]:8970"):
             self.assertTrue(server.HOST_RE.match(ok), ok)
-        for bad in ("evil.com:8899", "127.0.0.1.evil.com", "10.0.0.2:8899", ""):
+        for bad in ("evil.com:8970", "127.0.0.1.evil.com", "10.0.0.2:8970", ""):
             self.assertIsNone(server.HOST_RE.match(bad), bad)
 
     def test_content_status_reports_missing(self):

@@ -33,7 +33,7 @@ if os.environ.get("HUB_DB"):
     hub.DB_FILE = os.environ["HUB_DB"]
 
 HOST = "127.0.0.1"
-PORT_START = int(os.environ.get("HUB_PORT") or 8899)
+PORT_START = int(os.environ.get("HUB_PORT") or 8970)
 PORT_TRIES = 60
 STATE_FILE = os.environ.get("HUB_STATE") or os.path.join(HERE, ".hub_state.json")
 STATIC_DIR = os.path.join(HERE, "static")

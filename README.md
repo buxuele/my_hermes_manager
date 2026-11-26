@@ -24,7 +24,7 @@ cd my_hermes_manager
 ```
 
 脚本会拉起服务、探测端口、打开页面，已经运行时只打开页面并退出。
-端口从 8899 起找空闲的，真实地址写在 .hub_state.json。
+默认端口 8970，被占用时自动顺延，真实地址写在 .hub_state.json。
 
 首次启动会安装 launchd 后台同步 com.fanchuang.hermes-hub-sync，每 5 分钟同步一次。
 
