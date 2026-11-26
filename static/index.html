@@ -98,8 +98,17 @@ try { if (localStorage.getItem("hub_theme") === "gray") document.documentElement
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <div class="lightbox hidden" id="lightbox" role="dialog" aria-modal="true" aria-label="图片">
-  <button class="lightbox-close" id="lightboxClose" aria-label="关闭">×</button>
+  <div class="lightbox-bar">
+    <button class="lb-btn" id="lbShare" title="分享到 X">分享到 X</button>
+    <button class="lb-btn" id="lbSave" title="保存到本地">保存图片</button>
+    <button class="lb-btn" id="lightboxClose" aria-label="关闭">×</button>
+  </div>
   <img alt="">
+</div>
+
+<div class="ctx hidden" id="ctxMenu" role="menu">
+  <button class="ctx-item" id="ctxSave" role="menuitem">保存图片</button>
+  <button class="ctx-item" id="ctxShare" role="menuitem">分享到 X</button>
 </div>
 
 <script src="/static/app.js"></script>

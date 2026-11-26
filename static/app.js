@@ -19,12 +19,16 @@ const state = {
   focusIdx: -1,
   drawerMode: '',
   drawerUrl: '',
+  lightboxCtx: null,
+  ctxTarget: null,
   deletedOpen: false,
   syncing: false,
   confirmJob: '',
 };
 
 const $ = (id) => document.getElementById(id);
+
+let boardPagerData = null;
 const THEME_KEY = 'hub_theme';
 
 function applyTheme(name, save) {
@@ -533,17 +537,90 @@ async function loadOverview() {
   state.lastContent = data.stats.content;
 }
 
+/* ---------- 图片工具 ---------- */
+
+function extractLinks(body) {
+  const out = [];
+  const re = /\[(\d+)[.、]\s*([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
+  let m;
+  while ((m = re.exec(body || '')) !== null) {
+    out.push({ title: m[2].trim(), url: m[3] });
+  }
+  return out;
+}
+
+function saveImage(path) {
+  const name = path.split('/').pop();
+  const a = document.createElement('a');
+  a.href = '/media?path=' + encodeURIComponent(path);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  toast('已开始保存 ' + name);
+}
+
+function shareToX(ctx) {
+  if (!ctx) return;
+  const params = new URLSearchParams();
+  if (ctx.title) params.set('text', ctx.title);
+  if (ctx.url) params.set('url', ctx.url);
+  if (!ctx.title && !ctx.url) return;
+  window.open('https://x.com/intent/tweet?' + params.toString(), '_blank', 'noopener');
+}
+
+function openCtxMenu(x, y, ctx) {
+  const menu = $('ctxMenu');
+  state.ctxTarget = ctx;
+  const hasShare = Boolean(ctx && (ctx.url || ctx.title));
+  $('ctxShare').classList.toggle('hidden', !hasShare);
+  $('ctxSave').classList.toggle('hidden', !ctx || !ctx.ok);
+  menu.classList.remove('hidden');
+  const w = menu.offsetWidth || 150;
+  const h = menu.offsetHeight || 76;
+  menu.style.left = Math.min(x, window.innerWidth - w - 8) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight - h - 8) + 'px';
+  $('ctxSave').focus();
+}
+
+function closeCtxMenu() {
+  $('ctxMenu').classList.add('hidden');
+  state.ctxTarget = null;
+}
+
 /* ---------- 消息流 ---------- */
 
 const IMAGE_RE = /\.(jpe?g|png|gif|webp)$/i;
 
-function mediaHtml(media) {
+function imageCtx(m, idx) {
+  const links = extractLinks(m.body);
+  const hit = links[idx] || {};
+  const missing = (m.media_missing || [])[idx];
+  return { path: m.media[idx], title: hit.title || '', url: hit.url || '', ok: !missing };
+}
+
+function ctxAttrs(m, idx) {
+  const p = m.media[idx];
+  const ctx = imageCtx(m, idx);
+  return `data-ctx="${esc(JSON.stringify(ctx))}"`;
+}
+
+function figHtml(m, idx, cls) {
+  const p = m.media[idx];
+  const ctx = imageCtx(m, idx);
+  if (!ctx.ok) {
+    return `<figure class="${cls} miss" ${ctxAttrs(m, idx)}></figure>`;
+  }
+  return `<figure class="${cls}" ${ctxAttrs(m, idx)}>
+    <img loading="lazy" decoding="async" src="/media?path=${encodeURIComponent(p)}" alt="">
+  </figure>`;
+}
+
+function mediaHtml(media, m) {
   if (!media || !media.length) return '';
-  const imgs = media.filter((p) => IMAGE_RE.test(p));
+  const imgs = media.map((p, i) => ({ p, i })).filter((x) => IMAGE_RE.test(x.p));
   const docs = media.filter((p) => !IMAGE_RE.test(p));
-  const figs = imgs.map((p) =>
-    `<figure><img loading="lazy" decoding="async" src="/media?path=${encodeURIComponent(p)}" alt=""></figure>`
-  ).join('');
+  const figs = imgs.map((x) => figHtml(m, x.i, 'thumb')).join('');
   const chips = docs.map((p) => {
     const name = p.split('/').pop();
     return `<button class="media-doc" data-path="${encodeURIComponent(p)}" data-name="${esc(name)}"
@@ -552,8 +629,74 @@ function mediaHtml(media) {
   return `${figs ? `<div class="media-grid">${figs}</div>` : ''}${chips ? `<div class="media-docs">${chips}</div>` : ''}`;
 }
 
+let boardItems = [];
+
+function boardColumns() {
+  if (window.innerWidth <= 640) return 2;
+  if (window.innerWidth <= 1080) return 3;
+  return 4;
+}
+
+function renderBoard(items) {
+  boardItems = items;
+  renderBoardCols();
+  renderPager(boardPagerData);
+}
+
+function renderBoardCols() {
+  const el = $('timeline');
+  const cols = boardColumns();
+  const buckets = Array.from({ length: cols }, () => '');
+  let n = 0;
+  for (const m of boardItems) {
+    m.media.forEach((p, idx) => {
+      if (!IMAGE_RE.test(p)) return;
+      const ctx = imageCtx(m, idx);
+      const dataCtx = esc(JSON.stringify({ path: p, title: ctx.title, url: ctx.url }));
+      const img = ctx.ok
+        ? `<img loading="lazy" decoding="async" src="/media?path=${encodeURIComponent(p)}" alt="">`
+        : '';
+      buckets[n % cols] += `<figure class="pin${m.unread ? ' unread' : ''}${ctx.ok ? '' : ' miss'}" ${ctxAttrs(m, idx)}>
+        ${img}
+        <figcaption>
+          <span class="pin-title">${esc(ctx.title || m.job_name)}</span>
+          <span class="pin-time">${fmtClock(m.run_at)}</span>
+        </figcaption>
+      </figure>`;
+      n += 1;
+    });
+  }
+  el.innerHTML = '<div class="board">' +
+    buckets.map((h) => `<div class="board-col">${h}</div>`).join('') + '</div>';
+  el.querySelectorAll('.pin img').forEach((img) => {
+    const fig = img.closest('.pin');
+    const ctx = JSON.parse(fig.dataset.ctx);
+    img.addEventListener('error', () => {
+      fig.classList.add('miss');
+      img.remove();
+    });
+    img.addEventListener('click', () => openLightbox(img.src, ctx));
+  });
+  renderPager(boardPagerData);
+}
+
+function isBoardMode(items) {
+  if (!state.job || !items.length) return false;
+  let images = 0;
+  for (const m of items) {
+    for (const p of m.media) if (IMAGE_RE.test(p)) images += 1;
+  }
+  return images >= 8;
+}
+
 function renderTimeline(data) {
   const el = $('timeline');
+  document.body.classList.toggle('board', isBoardMode(data.items));
+  if (isBoardMode(data.items)) {
+    boardPagerData = data;
+    renderBoard(data.items);
+    return;
+  }
   if (!data.items.length) {
     if (data.silent_total > 0 && !state.silent) {
       el.innerHTML = `<div class="empty"><span class="big">这个任务有 ${data.silent_total} 条静默轮次</span>
@@ -593,7 +736,7 @@ function renderTimeline(data) {
           <a class="msg-time" href="#msg=${m.id}" data-msg="${m.id}" title="复制链接">${fmtClock(m.run_at)}</a>
           <button class="msg-copy" title="复制正文">复制</button>
         </div>
-        <div class="msg-body">${body}${mediaHtml(m.media)}</div>
+        <div class="msg-body">${body}${mediaHtml(m.media, m)}</div>
       </article>`;
   }
   el.innerHTML = html;
@@ -624,7 +767,11 @@ function decorateTimeline() {
       };
       img.addEventListener('error', fail);
       if (img.complete && img.naturalWidth === 0) fail();
-      img.addEventListener('click', () => openLightbox(img.src));
+      img.addEventListener('click', () => {
+        const fig = img.closest('[data-ctx]');
+        const ctx = fig ? JSON.parse(fig.dataset.ctx) : null;
+        openLightbox(img.src, ctx);
+      });
     });
   });
   highlightQuery();
@@ -827,9 +974,12 @@ async function openReader(path, name) {
 
 /* ---------- 灯箱 ---------- */
 
-function openLightbox(src) {
+function openLightbox(src, ctx) {
   const box = $('lightbox');
   box.querySelector('img').src = src;
+  state.lightboxCtx = ctx || null;
+  $('lbShare').classList.toggle('hidden', !(ctx && (ctx.url || ctx.title)));
+  $('lbSave').classList.toggle('hidden', !ctx || !ctx.ok);
   box.classList.remove('hidden');
 }
 
@@ -837,6 +987,7 @@ function closeLightbox() {
   const box = $('lightbox');
   box.classList.add('hidden');
   box.querySelector('img').removeAttribute('src');
+  state.lightboxCtx = null;
 }
 
 /* ---------- 已读确认 ---------- */
@@ -1012,6 +1163,28 @@ function bind() {
   };
   $('lightbox').onclick = closeLightbox;
   $('lightboxClose').onclick = (e) => { e.stopPropagation(); closeLightbox(); };
+  $('lbSave').onclick = (e) => {
+    e.stopPropagation();
+    if (state.lightboxCtx) saveImage(state.lightboxCtx.path);
+  };
+  $('lbShare').onclick = (e) => {
+    e.stopPropagation();
+    shareToX(state.lightboxCtx);
+  };
+
+  $('ctxSave').onclick = () => {
+    if (state.ctxTarget) saveImage(state.ctxTarget.path);
+    closeCtxMenu();
+  };
+  $('ctxShare').onclick = () => {
+    shareToX(state.ctxTarget);
+    closeCtxMenu();
+  };
+  document.addEventListener('click', (e) => {
+    if (!$('ctxMenu').classList.contains('hidden') && !e.target.closest('#ctxMenu')) {
+      closeCtxMenu();
+    }
+  });
 
   $('jobsGrid').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-job]');
@@ -1027,6 +1200,17 @@ function bind() {
     writeUrl('push');
     loadMessages();
     window.scrollTo({ top: 0 });
+  });
+
+  $('timeline').addEventListener('contextmenu', (e) => {
+    const fig = e.target.closest('[data-ctx]');
+    if (!fig) return;
+    e.preventDefault();
+    try {
+      openCtxMenu(e.clientX, e.clientY, JSON.parse(fig.dataset.ctx));
+    } catch (err) {
+      openCtxMenu(e.clientX, e.clientY, null);
+    }
   });
 
   $('timeline').addEventListener('click', (e) => {
@@ -1060,6 +1244,7 @@ function bind() {
     const tag = (e.target.tagName || '').toLowerCase();
     const typing = tag === 'input' || tag === 'textarea' || e.target.isContentEditable;
     if (e.key === 'Escape') {
+      if (!$('ctxMenu').classList.contains('hidden')) return closeCtxMenu();
       if (!$('modalMask').classList.contains('hidden')) return closeConfirm();
       if (!$('lightbox').classList.contains('hidden')) return closeLightbox();
       if ($('drawer').classList.contains('open')) return closeDrawer();
@@ -1085,6 +1270,14 @@ function bind() {
       items[state.focusIdx].classList.add('focus');
       items[state.focusIdx].scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
+  });
+
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (document.body.classList.contains('board')) renderBoardCols();
+    }, 200);
   });
 
   window.addEventListener('popstate', () => {

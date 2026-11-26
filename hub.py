@@ -636,6 +636,7 @@ def query_messages(
 
     items = []
     for r in rows:
+        media = json.loads(r["media"] or "[]")
         items.append(
             {
                 "id": r["id"],
@@ -646,7 +647,8 @@ def query_messages(
                 "mode": r["mode"],
                 "silent": bool(r["silent"]),
                 "body": r["body"],
-                "media": json.loads(r["media"] or "[]"),
+                "media": media,
+                "media_missing": [not os.path.isfile(p) for p in media],
                 "unread": (not r["silent"]) and r["run_ts"] > max(global_mark, job_marks.get(r["job_id"], 0)),
             }
         )
