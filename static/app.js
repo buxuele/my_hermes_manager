@@ -535,12 +535,21 @@ async function loadOverview() {
 
 /* ---------- 消息流 ---------- */
 
+const IMAGE_RE = /\.(jpe?g|png|gif|webp)$/i;
+
 function mediaHtml(media) {
   if (!media || !media.length) return '';
-  const figs = media.map((p) =>
+  const imgs = media.filter((p) => IMAGE_RE.test(p));
+  const docs = media.filter((p) => !IMAGE_RE.test(p));
+  const figs = imgs.map((p) =>
     `<figure><img loading="lazy" decoding="async" src="/media?path=${encodeURIComponent(p)}" alt=""></figure>`
   ).join('');
-  return `<div class="media-grid">${figs}</div>`;
+  const chips = docs.map((p) => {
+    const name = p.split('/').pop();
+    return `<button class="media-doc" data-path="${encodeURIComponent(p)}" data-name="${esc(name)}"
+      title="${esc(name)}"><span class="doc-tag">附件</span><span class="doc-name">${esc(name)}</span></button>`;
+  }).join('');
+  return `${figs ? `<div class="media-grid">${figs}</div>` : ''}${chips ? `<div class="media-docs">${chips}</div>` : ''}`;
 }
 
 function renderTimeline(data) {
@@ -1021,6 +1030,11 @@ function bind() {
   });
 
   $('timeline').addEventListener('click', (e) => {
+    const doc = e.target.closest('.media-doc');
+    if (doc) {
+      openReader(decodeURIComponent(doc.dataset.path), doc.dataset.name);
+      return;
+    }
     const copy = e.target.closest('.msg-copy');
     if (copy) {
       const card = copy.closest('.msg');

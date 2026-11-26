@@ -259,6 +259,79 @@ class HubTest(unittest.TestCase):
             hub.APPS_FILE = old_apps
             hub._EXEMPT_CACHE = {"mtime": None, "ids": set()}
 
+    def test_archive_hardlinks_and_rewrites(self):
+        img = os.path.join(self.tmp, "a.jpeg")
+        with open(img, "wb") as fh:
+            fh.write(b"\xff\xd8fake")
+        old_dir = hub.ARCHIVE_DIR
+        hub.ARCHIVE_DIR = os.path.join(self.tmp, "archive")
+        try:
+            write(self.out, "job-a", "2026-10-27_05-00-00.md",
+                  SAMPLE.replace("/tmp/a.jpeg", img).replace("2026-10-27 00:46:02", "2026-10-27 05:00:00"))
+            hub.sync(self.conn, self.out)
+            row = self.conn.execute(
+                "SELECT media FROM messages WHERE run_at = '2026-10-27 05:00:00'"
+            ).fetchone()
+            media = json.loads(row["media"])
+            self.assertTrue(media[0].startswith(hub.ARCHIVE_DIR))
+            self.assertTrue(os.path.samefile(media[0], img))
+            self.assertEqual(hub.sync(self.conn, self.out), 0)
+        finally:
+            hub.ARCHIVE_DIR = old_dir
+
+    def test_archive_keeps_missing_file(self):
+        old_dir = hub.ARCHIVE_DIR
+        hub.ARCHIVE_DIR = os.path.join(self.tmp, "archive")
+        try:
+            hub.sync(self.conn, self.out)
+            row = self.conn.execute(
+                "SELECT media FROM messages WHERE job_id = 'job-a' AND run_at = '2026-10-27 00:46:02'"
+            ).fetchone()
+            self.assertEqual(json.loads(row["media"]), ["/tmp/a.jpeg"])
+        finally:
+            hub.ARCHIVE_DIR = old_dir
+
+    def test_archive_backfill_runs_once(self):
+        img = os.path.join(self.tmp, "b.jpeg")
+        with open(img, "wb") as fh:
+            fh.write(b"img")
+        old_dir = hub.ARCHIVE_DIR
+        hub.ARCHIVE_DIR = os.path.join(self.tmp, "archive")
+        try:
+            self.conn.execute(
+                """INSERT INTO messages
+                   (id, job_id, job_name, run_at, run_ts, mode, silent, body, media, source_path)
+                   VALUES('m1', 'job-a', 'n', '2026-10-27 06:00:00', 1, '', 0, 'x', ?, 't')""",
+                (json.dumps([img]),),
+            )
+            self.conn.commit()
+            self.assertEqual(hub.archive_backfill(self.conn), 1)
+            row = self.conn.execute("SELECT media FROM messages WHERE id = 'm1'").fetchone()
+            self.assertTrue(json.loads(row["media"])[0].startswith(hub.ARCHIVE_DIR))
+            self.assertEqual(hub.archive_backfill(self.conn), 0)
+        finally:
+            hub.ARCHIVE_DIR = old_dir
+
+    def test_archive_takes_markdown_attachment(self):
+        doc = os.path.join(self.tmp, "文章.md")
+        with open(doc, "w", encoding="utf-8") as fh:
+            fh.write("# 标题")
+        old_dir = hub.ARCHIVE_DIR
+        hub.ARCHIVE_DIR = os.path.join(self.tmp, "archive")
+        try:
+            self.conn.execute(
+                """INSERT INTO messages
+                   (id, job_id, job_name, run_at, run_ts, mode, silent, body, media, source_path)
+                   VALUES('m2', 'job-b', 'n', '2026-10-27 07:00:00', 2, '', 0, 'x', ?, 't')""",
+                (json.dumps([doc]),),
+            )
+            self.conn.commit()
+            hub.archive_backfill(self.conn)
+            row = self.conn.execute("SELECT media FROM messages WHERE id = 'm2'").fetchone()
+            self.assertTrue(json.loads(row["media"])[0].startswith(hub.ARCHIVE_DIR))
+        finally:
+            hub.ARCHIVE_DIR = old_dir
+
 
 if __name__ == "__main__":
     unittest.main()

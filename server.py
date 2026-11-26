@@ -194,12 +194,12 @@ def static_path(raw):
 
 
 def content_roots():
-    """内容阅读器允许访问的目录，只来自 apps.json 的 content 应用。
+    """内容阅读器允许访问的目录：media_archive 归档与 apps.json 的 content 应用。
 
     不能沿用 ALLOW_ROOTS：那个范围包含整个 ~/.hermes，会让
     /api/file 读到 auth.json 这类含凭据的文件。
     """
-    roots = []
+    roots = [hub.ARCHIVE_DIR]
     for app in load_apps():
         if app.get("type") == "content" and app.get("path"):
             roots.append(app_path(app))

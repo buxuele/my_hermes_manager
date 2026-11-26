@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 logs/
+media_archive/
 .hub_state.json
 .no_auto_sync
 hub.db

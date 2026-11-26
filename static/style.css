@@ -550,6 +550,34 @@ body[data-view="apps"] .main { max-width: 1120px; }
   color: var(--muted);
 }
 
+.media-docs { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+
+.media-doc {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  border: 1px solid var(--brand-line);
+  border-radius: 6px;
+  background: var(--brand-soft);
+  padding: 6px 12px;
+  text-align: left;
+}
+.media-doc:hover { border-color: var(--brand); }
+.media-doc .doc-tag {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--brand);
+  flex: 0 0 auto;
+}
+.media-doc .doc-name {
+  font-size: 14px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ---------- 分页 ---------- */
 
 .pager {

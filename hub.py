@@ -31,6 +31,8 @@ EXEC_DB = os.path.join(CRON_DIR, "executions.db")
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(HERE, "hub.db")
 APPS_FILE = os.path.join(HERE, "apps.json")
+ARCHIVE_DIR = os.path.join(HERE, "media_archive")
+ARCHIVE_SUFFIX = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".md"}
 
 HEADER_JOB = re.compile(r"^#\s*Cron Job:\s*(.+?)\s*$", re.M)
 HEADER_KV = re.compile(r"^\*\*([A-Za-z ]+):\*\*\s*(.*?)\s*$", re.M)
@@ -132,6 +134,52 @@ def parse_output(path):
     }
 
 
+def archive_paths(job_id, media):
+    """把消息引用的图片硬链接进 media_archive，返回归档后的路径列表。
+
+    备货池投递完 6 小时就会删图，硬链接让总台自己留一份，不占额外空间。
+    知乎日报的附件是导出的 markdown 文章，也一起归档。
+    文件已经不存在的保留原路径，前端如实显示「图片已失效」。
+    """
+    out = []
+    for raw in media:
+        if not raw or raw.startswith(ARCHIVE_DIR):
+            out.append(raw)
+            continue
+        if not os.path.isfile(raw) or os.path.splitext(raw)[1].lower() not in ARCHIVE_SUFFIX:
+            out.append(raw)
+            continue
+        dest_dir = os.path.join(ARCHIVE_DIR, job_id)
+        dest = os.path.join(dest_dir, os.path.basename(raw))
+        try:
+            if not os.path.exists(dest):
+                os.makedirs(dest_dir, exist_ok=True)
+                os.link(raw, dest)
+            out.append(dest)
+        except OSError:
+            out.append(raw)
+    return out
+
+
+def archive_backfill(conn):
+    """升级后的一次性迁移：把库里还能救的图归档，然后写标记不再扫。"""
+    if get_state(conn, "archive_backfilled"):
+        return 0
+    fixed = 0
+    for row in conn.execute("SELECT id, job_id, media FROM messages WHERE media != '[]'"):
+        media = json.loads(row["media"])
+        new = archive_paths(row["job_id"], media)
+        if new != media:
+            conn.execute(
+                "UPDATE messages SET media = ? WHERE id = ?",
+                (json.dumps(new, ensure_ascii=False), row["id"]),
+            )
+            fixed += 1
+    set_state(conn, "archive_backfilled", 1)
+    conn.commit()
+    return fixed
+
+
 def iter_output_files(output_dir=OUTPUT_DIR):
     if not os.path.isdir(output_dir):
         return
@@ -182,6 +230,10 @@ def sync(conn=None, output_dir=OUTPUT_DIR, force=False):
             )
             if (msg["job_id"], msg["run_at"]) in known:
                 continue
+            if msg["media"] != "[]":
+                msg["media"] = json.dumps(
+                    archive_paths(msg["job_id"], json.loads(msg["media"])), ensure_ascii=False
+                )
             conn.execute(
                 """INSERT OR IGNORE INTO messages
                    (id, job_id, job_name, run_at, run_ts, mode, silent, body, media, source_path)
@@ -194,6 +246,7 @@ def sync(conn=None, output_dir=OUTPUT_DIR, force=False):
             stale = [(p,) for p in marks if p not in seen]
             if stale:
                 conn.executemany("DELETE FROM scanned_files WHERE path = ?", stale)
+        archive_backfill(conn)
         stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         conn.execute("INSERT OR REPLACE INTO state(key, value) VALUES('last_sync', ?)", (stamp,))
         conn.commit()
