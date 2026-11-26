@@ -55,6 +55,14 @@ class ContentFilesTest(unittest.TestCase):
         self.assertEqual(info["error"], "目录不存在")
         self.assertEqual(info["file_count"], 0)
 
+    def test_disposition_keeps_basename(self):
+        d = server.disposition("/cache/reddit/1xehkud.jpeg")
+        self.assertIn('filename="1xehkud.jpeg"', d)
+        self.assertIn("filename*=UTF-8''1xehkud.jpeg", d)
+        self.assertEqual(server.disposition(""), "")
+        self.assertNotIn("\\", server.disposition("a\\b.png"))
+        self.assertIn('filename="badname.png"', server.disposition('bad"name.png'))
+
 
 if __name__ == "__main__":
     unittest.main()

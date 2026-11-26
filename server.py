@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urljoin, urlparse, parse_qs, unquote
+from urllib.parse import quote, urljoin, urlparse, parse_qs, unquote
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -232,6 +232,14 @@ def json_bytes(obj):
     return json.dumps(obj, ensure_ascii=False).encode("utf-8")
 
 
+def disposition(name):
+    """保存媒体时带上原始文件名，浏览器另存为就不会叫 media。"""
+    safe = os.path.basename(name or "").replace("\\", "").replace('"', "")
+    if not safe:
+        return ""
+    return f'inline; filename="{safe}"; filename*=UTF-8\'\'{quote(safe)}'
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "HermesHub/2.0"
 
@@ -253,7 +261,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def send_file(self, path):
+    def send_file(self, path, filename=None):
         ext = os.path.splitext(path)[1].lower()
         ctype = {
             ".html": "text/html; charset=utf-8",
@@ -278,6 +286,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        disp = disposition(filename)
+        if disp:
+            self.send_header("Content-Disposition", disp)
         self.end_headers()
         self.wfile.write(data)
 
@@ -329,7 +340,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"error": "媒体已失效"}, 404)
             if os.path.splitext(target)[1].lower() not in MEDIA_SUFFIX:
                 return self.send_json({"error": "不支持的媒体类型"}, 403)
-            return self.send_file(target)
+            return self.send_file(target, filename=os.path.basename(target))
 
         return self.send_json({"error": "未找到"}, 404)
 

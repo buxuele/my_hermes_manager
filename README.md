@@ -110,7 +110,7 @@ apps 每项字段：
 | GET | /api/apps | 应用清单与状态 |
 | GET | /api/apps/<key>/files | 内容类应用的文件列表 |
 | GET | /api/file?path= | 读单个文本文件 |
-| GET | /media?path= | 读图片，限制在白名单目录内 |
+| GET | /media?path= | 读图片，限制在白名单目录内，另存为时用原始文件名 |
 | POST | /api/read | 标为已读，body 传 {"job": "任务ID"} 只标该任务 |
 | POST | /api/sync | 立即同步一次 |
 | GET | /health | 健康检查 |
