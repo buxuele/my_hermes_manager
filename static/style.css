@@ -581,7 +581,7 @@ body[data-view="apps"] .main { max-width: 1120px; }
 /* ---------- 图片墙 ---------- */
 
 body.board .sidebar { display: none; }
-body.board .shell { grid-template-columns: minmax(0, 1fr); }
+body.board .shell { grid-template-columns: minmax(0, 1fr); max-width: none; }
 body.board .main { max-width: none; padding: 22px 32px 120px; }
 
 .board { display: flex; align-items: flex-start; gap: 16px; }

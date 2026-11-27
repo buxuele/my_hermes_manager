@@ -243,7 +243,7 @@ function deliverText(d) {
 function readUrl() {
   const p = new URLSearchParams(location.hash.slice(1));
   const view = p.get('view');
-  state.view = ['feed', 'jobs', 'apps'].includes(view) ? view : 'feed';
+  state.view = ['feed', 'board', 'jobs', 'apps'].includes(view) ? view : 'feed';
   state.job = p.get('job') || '';
   state.q = p.get('q') || '';
   state.unread = p.get('unread') === '1';
@@ -349,7 +349,7 @@ function renderStats() {
   const count = state.job ? (job ? job.unread || 0 : 0) : (s.unread || 0);
   $('fabCnt').textContent = count;
   $('fab').disabled = !count;
-  $('fab').classList.toggle('hidden', state.view !== 'feed');
+  $('fab').classList.toggle('hidden', state.view !== 'feed' && state.view !== 'board');
   $('fab').firstChild.nodeValue = state.job ? '把这个任务标为已读 ' : '全部标为已读 ';
 
   if (s.first_at && s.newest_at) {
@@ -632,9 +632,8 @@ function mediaHtml(media, m) {
 let boardItems = [];
 
 function boardColumns() {
-  if (window.innerWidth <= 640) return 2;
-  if (window.innerWidth <= 1080) return 3;
-  return 4;
+  const byWidth = Math.floor((window.innerWidth - 64) / 240);
+  return Math.max(2, Math.min(6, byWidth));
 }
 
 function renderBoard(items) {
@@ -680,19 +679,9 @@ function renderBoardCols() {
   renderPager(boardPagerData);
 }
 
-function isBoardMode(items) {
-  if (!state.job || !items.length) return false;
-  let images = 0;
-  for (const m of items) {
-    for (const p of m.media) if (IMAGE_RE.test(p)) images += 1;
-  }
-  return images >= 8;
-}
-
 function renderTimeline(data) {
   const el = $('timeline');
-  document.body.classList.toggle('board', isBoardMode(data.items));
-  if (isBoardMode(data.items)) {
+  if (state.view === 'board') {
     boardPagerData = data;
     renderBoard(data.items);
     return;
@@ -1048,10 +1037,11 @@ async function copyText(text) {
 
 function showView() {
   document.body.dataset.view = state.view;
-  $('viewFeed').classList.toggle('hidden', state.view !== 'feed');
+  document.body.classList.toggle('board', state.view === 'board');
+  $('viewFeed').classList.toggle('hidden', state.view !== 'feed' && state.view !== 'board');
   $('viewJobs').classList.toggle('hidden', state.view !== 'jobs');
   $('viewApps').classList.toggle('hidden', state.view !== 'apps');
-  $('fab').classList.toggle('hidden', state.view !== 'feed');
+  $('fab').classList.toggle('hidden', state.view !== 'feed' && state.view !== 'board');
 }
 
 function goView(view, push) {
@@ -1066,7 +1056,7 @@ function goView(view, push) {
   showView();
   syncControls();
   writeUrl(push ? 'push' : 'replace');
-  if (view === 'feed') loadMessages();
+  if (view === 'feed' || view === 'board') loadMessages();
   if (view === 'jobs') renderTasks();
   if (view === 'apps') renderApps();
   window.scrollTo({ top: 0 });
@@ -1276,7 +1266,7 @@ function bind() {
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      if (document.body.classList.contains('board')) renderBoardCols();
+      if (state.view === 'board') renderBoardCols();
     }, 200);
   });
 
@@ -1285,7 +1275,7 @@ function bind() {
     $('searchInput').value = state.q;
     showView();
     syncControls();
-    if (state.view === 'feed') loadMessages();
+    if (state.view === 'feed' || state.view === 'board') loadMessages();
     if (state.view === 'jobs') renderTasks();
     if (state.view === 'apps') renderApps();
   });
@@ -1301,7 +1291,7 @@ async function manualSync() {
     state.until = null;
     $('newBar').classList.add('hidden');
     await loadOverview();
-    if (state.view === 'feed') await loadMessages();
+    if (state.view === 'feed' || state.view === 'board') await loadMessages();
   } catch (err) {
     toast('同步失败：' + err.message);
   } finally {
@@ -1319,7 +1309,7 @@ async function boot() {
   syncControls();
   try {
     await loadOverview();
-    if (state.view === 'feed') await loadMessages();
+    if (state.view === 'feed' || state.view === 'board') await loadMessages();
   } catch (err) {
     const box = state.view === 'apps' ? $('appsGrid') : state.view === 'jobs' ? $('jobsGrid') : $('timeline');
     box.innerHTML = `<div class="empty"><span class="big">读取失败</span>${esc(err.message)}<button class="btn-sm" id="retryBoot">重试</button></div>`;
